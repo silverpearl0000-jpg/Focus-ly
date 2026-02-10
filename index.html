@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Focusly</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+:root{
+  --bg:#f6f1e9;
+  --card:rgba(255,255,255,0.75);
+  --text:#111;
+  --accent:#6c63ff;
+}
+body.dark{--bg:#0e1020;--card:rgba(25,30,60,0.8);--text:#fff;--accent:#00ffd5}
+body.midnight{--bg:#050510;--card:rgba(15,15,40,0.85);--text:#eaeaff;--accent:#7f7cff}
+body.cream{--bg:#fff7e6;--card:rgba(255,255,255,0.85);--text:#222;--accent:#ff9f43}
+
+*{box-sizing:border-box;font-family:system-ui,-apple-system}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  display:flex;justify-content:center;align-items:center;height:100vh;
+  transition:background .4s;
+}
+
+.app{
+  width:92%;max-width:900px;height:92%;
+  display:flex;flex-direction:column;
+}
+
+header{
+  text-align:center;font-size:42px;font-weight:700;margin:10px 0;
+}
+.logo .ly{
+  background:linear-gradient(270deg,red,orange,yellow,green,blue,purple);
+  background-size:400% 400%;
+  -webkit-background-clip:text;color:transparent;
+  animation:rainbow 4s infinite linear;
+}
+@keyframes rainbow{0%{background-position:0%}100%{background-position:100%}}
+
+.card{
+  background:var(--card);
+  backdrop-filter:blur(18px);
+  border-radius:20px;
+  padding:20px;
+  margin:10px 0;
+  box-shadow:0 20px 40px rgba(0,0,0,.1);
+}
+
+input{
+  width:100%;padding:14px;border:none;border-radius:12px;
+  font-size:16px;
+}
+
+.timer{
+  font-size:56px;font-weight:700;text-align:center;margin:15px 0;
+}
+
+.controls,.time-set{
+  display:flex;justify-content:center;gap:15px;
+}
+
+button{
+  padding:12px 18px;border:none;border-radius:14px;
+  background:var(--accent);color:#fff;font-size:15px;
+  cursor:pointer;transition:.2s;
+}
+button:active{transform:scale(.95)}
+
+.thought{
+  text-align:center;font-size:18px;min-height:50px;
+  animation:fade .4s;
+}
+@keyframes fade{from{opacity:0;transform:translateY(10px)}to{opacity:1}}
+
+.tabs{
+  display:flex;gap:8px;margin-top:auto;
+}
+.tab{
+  flex:1;text-align:center;padding:12px;border-radius:14px;
+  background:var(--card);cursor:pointer;
+}
+
+.hidden{display:none}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+<header class="logo">Focus<span class="ly">ly</span></header>
+
+<!-- FOCUS TAB -->
+<div id="focusTab">
+  <div class="card">
+    <input id="task" placeholder="What are you focusing on?">
+  </div>
+
+  <div class="card">
+    <div class="time-set">
+      <button id="minus">−</button>
+      <strong id="mins">25</strong> min
+      <button id="plus">+</button>
+    </div>
+    <div class="timer" id="timer">25:00</div>
+    <div class="controls">
+      <button id="start">Start</button>
+      <button id="reset">Reset</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="thought" id="thought"></div>
+    <div class="controls">
+      <button id="newThought">New Thought</button>
+    </div>
+  </div>
+</div>
+
+<!-- STATS TAB -->
+<div id="statsTab" class="hidden card">
+  <h3>Stats</h3>
+  <p>Sessions: <span id="sessions">0</span></p>
+  <p>XP: <span id="xp">0</span></p>
+  <p>Streak: <span id="streak">0</span> days</p>
+</div>
+
+<!-- SETTINGS TAB -->
+<div id="settingsTab" class="hidden card">
+  <h3>Theme</h3>
+  <div class="controls">
+    <button onclick="setTheme('')">Light</button>
+    <button onclick="setTheme('dark')">Dark</button>
+    <button onclick="setTheme('midnight')">Midnight</button>
+    <button onclick="setTheme('cream')">Cream</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab" onclick="showTab('focus')">Focus</div>
+  <div class="tab" onclick="showTab('stats')">Stats</div>
+  <div class="tab" onclick="showTab('settings')">Settings</div>
+</div>
+</div>
+
+<!-- Audio element -->
+<audio id="alarmSound" src="Alaram.wav" preload="auto"></audio>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+
+  let mins = +localStorage.mins || 25;
+  let secs = 0;
+  let run = null;
+  let pool = [];
+
+  let sessions = +localStorage.sessions || 0;
+  let xp = +localStorage.xp || 0;
+  let streak = +localStorage.streak || 0;
+
+  const timer = document.getElementById("timer");
+  const minsEl = document.getElementById("mins");
+  const thoughtEl = document.getElementById("thought");
+
+  const startBtn = document.getElementById("start");
+  const resetBtn = document.getElementById("reset");
+  const plusBtn = document.getElementById("plus");
+  const minusBtn = document.getElementById("minus");
+  const newThoughtBtn = document.getElementById("newThought");
+
+  const focusTab = document.getElementById("focusTab");
+  const statsTab = document.getElementById("statsTab");
+  const settingsTab = document.getElementById("settingsTab");
+
+  const sessionsEl = document.getElementById("sessions");
+  const xpEl = document.getElementById("xp");
+  const streakEl = document.getElementById("streak");
+
+  const alarmSound = document.getElementById("alarmSound");
+
+  // 120 thoughts
+  const thoughts = [
+"Stay focused on the task at hand.","One step at a time leads to success.","Distraction is the enemy of progress.","Small progress is better than no progress.","Your work matters, keep going.",
+"Concentration is the key to mastery.","Clear mind, productive day.","Break tasks into smaller steps.","Focus on what you can control.","Eliminate distractions before starting.",
+"Consistency beats intensity.","Deep work produces the best results.","Prioritize the most important task.","Silence your inner critic.","Stay present in your work.",
+"Time is your most valuable asset.","Your effort today shapes tomorrow.","Work in focused intervals.","Avoid multitasking for clarity.","Single-minded focus produces excellence.",
+"Reward yourself for completing tasks.","Prepare your environment for focus.","Rest is part of productivity.","Stay disciplined with your schedule.","Focus grows with practice.",
+"Keep your goals visible.","Track your daily achievements.","Success comes from persistence.","Your attention is your power.","Create routines that support focus.",
+"Visualize the task completed.","Minimize notifications while working.","Take deep breaths to reset focus.","Progress over perfection.","Organize your workspace before starting.",
+"Focus on the process, not the result.","Eliminate unnecessary tasks.","Your mind is sharper after breaks.","Write down your top priorities.","Stay curious and engaged.",
+"Energy management is as important as time management.","Learn to say no to distractions.","Keep a clear plan for your day.","Set realistic deadlines.","Celebrate small wins.",
+"Stay hydrated and alert.","Exercise helps maintain focus.","Reflect on your accomplishments daily.","Start with the hardest task first.","Discipline over motivation.",
+"Your focus improves with practice.","Declutter your workspace regularly.","Batch similar tasks together.","Use timers to maintain rhythm.","Limit social media interruptions.",
+"Focus on progress, not speed.","Stay patient with complex tasks.","Keep a positive mindset.","Eliminate mental clutter before starting.","Focus on one idea at a time.",
+"Break complex tasks into manageable pieces.","Maintain a healthy work-life balance.","Consistency compounds over time.","Clear goals drive focus.","Reduce decision fatigue by planning ahead.",
+"Create a distraction-free zone.","Use reminders to stay on track.","Prioritize quality over quantity.","Stay flexible but disciplined.","Track your time to identify distractions.",
+"Your mind needs clarity to focus.","Eliminate unnecessary multitasking.","Visualize completing your tasks successfully.","Stay mindful of your energy levels.","Use breaks strategically to recharge.",
+"Focus on improvement, not comparison.","Reward yourself for completing milestones.","Maintain a growth mindset.","Organize digital files for efficiency.","Learn to focus under pressure.",
+"Create rituals that signal focus time.","Stay away from negative influences.","Practice deep work regularly.","Write tasks down to clear your mind.","Keep a clean desk for a clean mind.",
+"Prioritize your health for better focus.","Time-block your day.","Reduce interruptions proactively.","Review your goals daily.","Focus on your strengths.",
+"Stay committed to your schedule.","Eliminate distractions in your environment.","Use a timer for productivity sprints.","Stay motivated by tracking progress.","Focus on solutions, not problems.",
+"Maintain a journal for reflection.","Prioritize clarity over speed.","Practice single-tasking consistently.","Start your day with intention.","Use music or white noise if it helps.",
+"Stay accountable to your goals.","Keep challenging yourself.","Reflect on your work daily.","Stay organized and disciplined.","Focus on what truly matters.",
+"Avoid unnecessary meetings.","Delegate tasks when possible.","Use visualization to enhance focus.","Focus on deep work sessions.","Limit email and messaging interruptions.",
+"Take time to plan your day.","Work smarter, not harder.","Keep learning and growing.","Focus on tasks that move you forward.","Maintain mental clarity through meditation.",
+"Stay consistent with your routines.","Prioritize tasks by importance.","Break long projects into phases.","Stay aware of your energy cycles.","Remove unnecessary choices.",
+"Maintain a calm and focused mind.","Practice gratitude to reduce stress.","Keep your objectives clear.","Focus on execution, not ideas alone.","Limit exposure to negative media."
+  ];
+
+  function update(){
+    minsEl.textContent = mins;
+    timer.textContent = `${String(mins).padStart(2,"0")}:${String(secs).padStart(2,"0")}`;
+  }
+
+  function save(){ localStorage.mins = mins; update(); }
+
+  function newThought(){
+    if(!pool.length) pool = [...thoughts];
+    thoughtEl.textContent = pool.splice(Math.floor(Math.random()*pool.length), 1)[0];
+  }
+
+  startBtn.onclick = () => {
+    if(run) return;
+    run = setInterval(() => {
+      if(secs === 0){
+        if(mins === 0){
+          clearInterval(run); run = null;
+          sessions++; xp += 10; streak++;
+          localStorage.sessions = sessions;
+          localStorage.xp = xp;
+          localStorage.streak = streak;
+          updateStats();
+
+          // Play alarm and vibrate
+          alarmSound.currentTime = 0;
+          alarmSound.play();
+          if(navigator.vibrate) navigator.vibrate(500);
+
+          mins = +localStorage.mins || 25;
+          secs = 0;
+          update();
+          newThought();
+          return;
+        }
+        mins--; secs = 59;
+      } else { secs--; }
+      update();
+    },1000);
+  };
+
+  resetBtn.onclick = () => {
+    clearInterval(run); run = null;
+    mins = +localStorage.mins || 25; secs = 0; update();
+  };
+
+  let pressTimer;
+
+plusBtn.addEventListener("mousedown", () => {
+  increaseMinutes(); // immediate increase
+  pressTimer = setInterval(increaseMinutes, 150); // repeat while holding
+});
+plusBtn.addEventListener("mouseup", () => clearInterval(pressTimer));
+plusBtn.addEventListener("mouseleave", () => clearInterval(pressTimer));
+
+minusBtn.addEventListener("mousedown", () => {
+  decreaseMinutes(); // immediate decrease
+  pressTimer = setInterval(decreaseMinutes, 150); // repeat while holding
+});
+minusBtn.addEventListener("mouseup", () => clearInterval(pressTimer));
+minusBtn.addEventListener("mouseleave", () => clearInterval(pressTimer));
+
+function increaseMinutes() {
+  if(!run){ mins++; secs = 0; save(); }
+}
+
+function decreaseMinutes() {
+  if(!run && mins > 1){ mins--; secs = 0; save(); }
+}
+
+  function updateStats(){
+    sessionsEl.textContent = sessions;
+    xpEl.textContent = xp;
+    streakEl.textContent = streak;
+  }
+
+  window.showTab = (t) => {
+    focusTab.classList.toggle("hidden", t !== "focus");
+    statsTab.classList.toggle("hidden", t !== "stats");
+    settingsTab.classList.toggle("hidden", t !== "settings");
+  };
+
+  window.setTheme = (t) => {
+    document.body.className = t;
+    localStorage.theme = t;
+  };
+
+  setTheme(localStorage.theme||"");
+  update(); updateStats(); newThought();
+  newThoughtBtn.onclick = newThought;
+
+});
+</script>
+</body>
+</html>
