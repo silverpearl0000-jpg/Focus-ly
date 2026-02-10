@@ -1,6 +1,7 @@
 {
   "name": "Focusly",
   "short_name": "Focusly",
+  "description": "Focusly helps you stay focused with timer-based sessions and motivational thoughts.",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f6f1e9",
